@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: openobserve
+    ports:
+      - "5080:5080"
+    volumes:
+      - openobserve-data:/data
+    environment:
+      - ZO_ROOT_USER_EMAIL=admin@example.com
+      - ZO_ROOT_USER_PASSWORD=ComplexPass123!
+      - ZO_DATA_DIR=/data
+    restart: unless-stopped
+
+volumes:
+  openobserve-data:

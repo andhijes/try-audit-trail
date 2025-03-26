@@ -1,0 +1,83 @@
+version: '3'
+services:
+  mongodb_graylog:
+    image: mongo:5.0
+    container_name: mongodb_graylog
+    volumes:
+      - mongodb_graylog_data:/data/db
+    networks:
+      - graylog_elastic_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  es00graylog:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.9
+    container_name: es00graylog
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks:
+      - graylog_elastic_network
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  graylog:
+    image: graylog/graylog:5.0
+    container_name: graylog
+    environment:
+      - GRAYLOG_PASSWORD_SECRET=somepasswordpepper
+      - GRAYLOG_ROOT_PASSWORD_SHA2=8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+      - GRAYLOG_HTTP_EXTERNAL_URI=http://127.0.0.1:9000/
+      - GRAYLOG_MONGODB_URI=mongodb://mongodb_graylog:27017/graylog
+      - GRAYLOG_ELASTICSEARCH_HOSTS=http://es00graylog:9200
+      - GRAYLOG_ELASTICSEARCH_SHARDS=1
+      - GRAYLOG_ELASTICSEARCH_REPLICAS=0
+      - GRAYLOG_ELASTICSEARCH_CONNECTION_TIMEOUT=10s
+      - GRAYLOG_MESSAGE_JOURNAL_MAX_SIZE=100mb
+      - GRAYLOG_DISABLE_JOURNAL_PREALLOCATION=true
+      - GRAYLOG_OUTPUT_BATCH_SIZE=500
+      - GRAYLOG_TRANSPORT_URI=udp://0.0.0.0:12201
+      - GRAYLOG_ALLOW_INSECURE_TCP=true
+      - GRAYLOG_ROOT_TIMEZONE=Asia/Jakarta
+    depends_on:
+      mongodb_graylog:
+        condition: service_healthy
+      es00graylog:
+        condition: service_healthy    
+    ports:
+      - 9000:9000
+      - "12201:12201/udp"
+      - "12201:12201/tcp"
+    networks:
+      - graylog_elastic_network
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+        reservations:
+          memory: 512m
+
+networks:
+  graylog_elastic_network:
+    name: graylog_elastic_network
+    external: true
+    driver: bridge
+
+volumes:
+  mongodb_graylog_data:
+  es_data:
